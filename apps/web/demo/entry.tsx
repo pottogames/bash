@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Alert, DirectionProvider, MantineProvider } from '@mantine/core';
 import { ModalsProvider } from '@mantine/modals';
@@ -29,7 +29,9 @@ import { __setPathname } from './shims/next-navigation';
  * database, which is exactly why they cannot be demonstrated in a page.
  */
 
-const ROUTES: Record<string, () => JSX.Element> = {
+// `ReactElement`, not the global `JSX.Element` — React 19 removed the global
+// JSX namespace, so the old spelling no longer resolves.
+const ROUTES: Record<string, () => ReactElement> = {
   '/': HomePage,
   '/upload': UploadPage,
   '/layers': LayersPage,
