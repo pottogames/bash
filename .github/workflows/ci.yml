@@ -11,9 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # No `version:` here on purpose. `packageManager` in package.json already
+      # pins pnpm, and specifying both makes the action refuse to run rather
+      # than pick one.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -60,12 +61,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # No `version:` here on purpose. `packageManager` in package.json already
+      # pins pnpm, and specifying both makes the action refuse to run rather
+      # than pick one.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The engine packages resolve to their `dist` types when Next typechecks,
+      # so they have to exist before the app is built.
+      - run: pnpm build
       - run: pnpm --filter @plan2quote/web build
