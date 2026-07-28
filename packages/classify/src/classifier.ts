@@ -137,7 +137,15 @@ export function classifyLayer(input: ClassifyInput): LayerClassification {
     return {
       sourceKey,
       trade,
-      measureType: overrideMeasure(sourceName, standard.match.measureType, evidence),
+      // The standard names the trade authoritatively, but its measurement type
+      // is still only a convention — `A-WALL` is an area on a plan and a length
+      // when the layer holds centrelines. Letting a clear entity mix win here
+      // is what stops a wall layer of open polylines measuring zero.
+      measureType: overrideMeasure(
+        sourceName,
+        resolveMeasureType(standard.match.measureType, geometry, evidence),
+        evidence,
+      ),
       confidence: 0.9,
       source: 'layer_standard',
       evidence,

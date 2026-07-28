@@ -139,6 +139,25 @@ describe('AIA layer standards', () => {
     expect(classifyLayer({ sourceKey: 'c', sourceName: 'E-LITE' }).measureType).toBe('count');
   });
 
+  it('lets a clear entity mix override the standard measurement type', () => {
+    // AIA calls A-WALL an area, and on a plan it usually is. This layer holds
+    // nothing but open centrelines, so measuring its area gives zero — the
+    // drawing is better evidence than the convention.
+    const result = classifyLayer({
+      sourceKey: 'a',
+      sourceName: 'A-WALL-FULL',
+      entities: openPolys(6),
+    });
+    expect(result.trade).toBe('masonry');
+    expect(result.measureType).toBe('length');
+    expect(result.evidence.some((e) => e.kind === 'geometry_hint')).toBe(true);
+  });
+
+  it('keeps the standard measurement type when the entity mix is ambiguous', () => {
+    const result = classifyLayer({ sourceKey: 'a', sourceName: 'A-WALL-FULL' });
+    expect(result.measureType).toBe('area');
+  });
+
   it('a DEMO status overrides the trade', () => {
     const result = classifyLayer({ sourceKey: 'a', sourceName: 'A-WALL-FULL-DEMO' });
     expect(result.trade).toBe('demolition');
