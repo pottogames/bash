@@ -23,7 +23,9 @@
     "react-dom": "^19.0.0",
     "@plan2quote/core": "workspace:*",
     "@plan2quote/geometry": "workspace:*",
-    "@plan2quote/classify": "workspace:*"
+    "@plan2quote/classify": "workspace:*",
+    "@mantine/dropzone": "^7.17.0",
+    "@plan2quote/parsers": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19.0.8",

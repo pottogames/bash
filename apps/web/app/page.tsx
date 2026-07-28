@@ -39,7 +39,9 @@ export default function HomePage() {
         title="פרויקטים"
         description={`${DEMO_STRUCTURE.project.name} ועוד. כל פרויקט מתחיל בתוכנית ונגמר בחבילות עבודה שכל גורם רואה רק את החלק שלו.`}
         actions={
-          <Button leftSection={<IconFileUpload size={16} />}>העלאת תוכנית</Button>
+          <Button component={Link} href="/upload" leftSection={<IconFileUpload size={16} />}>
+            העלאת תוכניות
+          </Button>
         }
       />
 

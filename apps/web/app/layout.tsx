@@ -4,6 +4,7 @@ import { ModalsProvider } from '@mantine/modals';
 import { Notifications } from '@mantine/notifications';
 import { theme } from './theme';
 import { Shell } from '@/components/Shell';
+import '@mantine/dropzone/styles.css';
 import './globals.css';
 
 export const metadata: Metadata = {

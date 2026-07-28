@@ -17,6 +17,7 @@ import { useDisclosure } from '@mantine/hooks';
 import {
   IconBuildingCommunity,
   IconClipboardList,
+  IconCloudUpload,
   IconFileInvoice,
   IconLayersIntersect,
   IconMoon,
@@ -37,6 +38,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { href: '/', label: 'פרויקטים', icon: IconBuildingCommunity },
+  { href: '/upload', label: 'העלאת תוכניות', icon: IconCloudUpload },
   { href: '/structure', label: 'מבנה הפרויקט', icon: IconLayersIntersect },
   { href: '/layers', label: 'ניהול שכבות', icon: IconClipboardList },
   { href: '/quantities', label: 'כתב כמויות', icon: IconFileInvoice, disabled: true },

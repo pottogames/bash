@@ -32,6 +32,9 @@ importers:
       '@mantine/core':
         specifier: ^7.17.0
         version: 7.17.8(@mantine/hooks@7.17.8(react@19.2.8))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@mantine/dropzone':
+        specifier: ^7.17.0
+        version: 7.17.8(@mantine/core@7.17.8(@mantine/hooks@7.17.8(react@19.2.8))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@mantine/hooks@7.17.8(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@mantine/form':
         specifier: ^7.17.0
         version: 7.17.8(react@19.2.8)
@@ -53,6 +56,9 @@ importers:
       '@plan2quote/geometry':
         specifier: workspace:*
         version: link:../../packages/geometry
+      '@plan2quote/parsers':
+        specifier: workspace:*
+        version: link:../../packages/parsers
       '@supabase/ssr':
         specifier: ^0.5.2
         version: 0.5.2(@supabase/supabase-js@2.111.0)
@@ -502,6 +508,14 @@ packages:
   '@mantine/core@7.17.8':
     resolution: {integrity: sha512-42sfdLZSCpsCYmLCjSuntuPcDg3PLbakSmmYfz5Auea8gZYLr+8SS5k647doVu0BRAecqYOytkX2QC5/u/8VHw==}
     peerDependencies:
+      '@mantine/hooks': 7.17.8
+      react: ^18.x || ^19.x
+      react-dom: ^18.x || ^19.x
+
+  '@mantine/dropzone@7.17.8':
+    resolution: {integrity: sha512-c9WEArpP23E9tbRWqoznEY3bGPVntMuBKr3F2LQijgdpdALIzt6DYmwXu7gUajGX9Qg9NrCHenhvWLTYqKnRlA==}
+    peerDependencies:
+      '@mantine/core': 7.17.8
       '@mantine/hooks': 7.17.8
       react: ^18.x || ^19.x
       react-dom: ^18.x || ^19.x
@@ -1349,6 +1363,12 @@ packages:
     peerDependencies:
       react: ^19.2.8
 
+  react-dropzone-esm@15.2.0:
+    resolution: {integrity: sha512-pPwR8xWVL+tFLnbAb8KVH5f6Vtl397tck8dINkZ1cPMxHWH+l9dFmIgRWgbh7V7jbjIcuKXCsVrXbhQz68+dVA==}
+    engines: {node: '>= 10.13'}
+    peerDependencies:
+      react: '>= 16.8 || 18.0.0'
+
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
 
@@ -1939,6 +1959,14 @@ snapshots:
       type-fest: 4.41.0
     transitivePeerDependencies:
       - '@types/react'
+
+  '@mantine/dropzone@7.17.8(@mantine/core@7.17.8(@mantine/hooks@7.17.8(react@19.2.8))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@mantine/hooks@7.17.8(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+    dependencies:
+      '@mantine/core': 7.17.8(@mantine/hooks@7.17.8(react@19.2.8))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@mantine/hooks': 7.17.8(react@19.2.8)
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
+      react-dropzone-esm: 15.2.0(react@19.2.8)
 
   '@mantine/form@7.17.8(react@19.2.8)':
     dependencies:
@@ -2710,6 +2738,11 @@ snapshots:
     dependencies:
       react: 19.2.8
       scheduler: 0.27.0
+
+  react-dropzone-esm@15.2.0(react@19.2.8):
+    dependencies:
+      prop-types: 15.8.1
+      react: 19.2.8
 
   react-is@16.13.1: {}
 

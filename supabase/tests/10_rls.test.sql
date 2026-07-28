@@ -115,8 +115,8 @@ begin
   insert into public.buildings (id, project_id, name) values (bld, proj_a, 'בניין A');
   insert into public.floors (id, building_id, level, name) values (flr, bld, 3, 'קומה 3');
 
-  insert into public.plans (id, project_id, building_id, floor_id, name, original_filename, format, storage_path, status)
-  values (plan_id, proj_a, bld, flr, 'קומה 3', 'floor3.dxf', 'dxf', 'plans/floor3.dxf', 'parsed');
+  insert into public.plans (id, project_id, building_id, floor_id, name, original_filename, format, storage_path, status, sheet_kind, measurable)
+  values (plan_id, proj_a, bld, flr, 'קומה 3', 'floor3.dxf', 'dxf', 'plans/floor3.dxf', 'parsed', 'floor_plan', true);
 
   insert into public.plan_layers (id, plan_id, source_key, source_name, trade_id, measure_type)
   values
@@ -571,6 +571,52 @@ begin
     raised := true;
   end;
   perform pg_temp.assert(true, 'יומן הביקורת מוגן');
+end $$;
+
+-- =============================================================================
+-- 15. A details sheet cannot produce quantities
+--
+-- The customer's own drawing set includes a sheet of six waterproofing details
+-- at 1:5 and 1:10. Measured like a floor plan it yields confident, fictional
+-- square metres. The UI refuses, the worker refuses, and this is the third
+-- refusal — the one that holds against a direct PostgREST write.
+-- =============================================================================
+do $$
+declare
+  detail_plan uuid := gen_random_uuid();
+  proj_a uuid := current_setting('test.proj_a')::uuid;
+  raised boolean := false;
+begin
+  perform pg_temp.as_user(current_setting('test.u_owner')::uuid);
+
+  insert into public.plans (id, project_id, name, original_filename, format, storage_path, status, sheet_kind, measurable)
+  values (detail_plan, proj_a, 'פרטי איטום', 'details.dxf', 'dxf', 'plans/details.dxf', 'parsed', 'detail_sheet', false);
+
+  begin
+    insert into public.quantity_lines (project_id, plan_id, description, measure_type, unit, value)
+    values (proj_a, detail_plan, 'שטח מהצללות בפרטים', 'area', 'מ״ר', 412.5);
+  exception when others then
+    raised := true;
+  end;
+  perform pg_temp.assert(raised, 'שורת כמות מגיליון פרטים נדחית');
+
+  -- A line somebody typed in on purpose is still allowed: the refusal is about
+  -- measuring the sheet, not about the sheet existing.
+  insert into public.quantity_lines (project_id, plan_id, description, measure_type, unit, value, is_manual)
+  values (proj_a, detail_plan, 'איטום — הערכה ידנית', 'area', 'מ״ר', 120, true);
+
+  perform pg_temp.assert(
+    (select count(*) from public.quantity_lines where plan_id = detail_plan) = 1,
+    'שורה ידנית מגיליון פרטים מותרת');
+
+  -- And once a human marks the sheet measurable, measurement is allowed.
+  update public.plans set measurable = true, sheet_kind_source = 'manual' where id = detail_plan;
+  insert into public.quantity_lines (project_id, plan_id, description, measure_type, unit, value)
+  values (proj_a, detail_plan, 'אחרי אישור ידני', 'area', 'מ״ר', 10);
+
+  perform pg_temp.assert(
+    (select count(*) from public.quantity_lines where plan_id = detail_plan) = 2,
+    'לאחר סימון ידני של הגיליון כניתן למדידה, מדידה מותרת');
 end $$;
 
 reset role;
