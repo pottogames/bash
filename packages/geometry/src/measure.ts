@@ -1,4 +1,4 @@
-import type { MeasureType, PlanEntity, PlanWarningCode, Vec2 } from '@plan2quote/core';
+import type { MeasureType, PlanEntity, PlanWarningCode, PolylineEntity } from '@plan2quote/core';
 import { compensatedSum } from './vec.js';
 import { arcLength, normalisedSweep } from './arc.js';
 import {
@@ -138,7 +138,7 @@ function measureLength(entities: readonly PlanEntity[]): Partial_ {
           warnings.push({ code: 'degenerate_geometry', message: 'קו עם פחות משתי נקודות — דולג.', ref: e.id });
           continue;
         }
-        breakdown.push({ entityId: e.id, value: pathLength(toRing(e.vertices), e.closed) });
+        breakdown.push({ entityId: e.id, value: pathLength(toRing(e), e.closed) });
         break;
       }
       case 'circle':
@@ -182,7 +182,11 @@ function measureArea(entities: readonly PlanEntity[], subtractNested: boolean): 
   const rings: { id: string; ring: Ring }[] = [];
   for (const e of entities) {
     if (e.kind !== 'polyline') continue;
-    if (e.vertices.length < 3) {
+    // A closed two-vertex polyline is a real shape when both sides are bulged:
+    // it is how DXF stores a circle drawn as a polyline, and how a stadium
+    // outline is drawn. Requiring three vertices would measure those as zero.
+    const curved = e.closed && (e.bulges?.some((b) => b !== 0) ?? false);
+    if (e.vertices.length < (curved ? 2 : 3)) {
       warnings.push({ code: 'degenerate_geometry', message: 'מצולע עם פחות מ-3 נקודות — דולג.', ref: e.id });
       continue;
     }
@@ -201,7 +205,7 @@ function measureArea(entities: readonly PlanEntity[], subtractNested: boolean): 
         ref: e.id,
       });
     }
-    rings.push({ id: e.id, ring: toRing(e.vertices) });
+    rings.push({ id: e.id, ring: toRing(e) });
   }
 
   if (rings.length > 0) {
@@ -330,8 +334,13 @@ function sumBreakdown(
   };
 }
 
-function toRing(vertices: readonly Vec2[]): Ring {
-  return { vertices: [...vertices] };
+/**
+ * Carries the polyline's bulges through to the geometry routines. Dropping them
+ * here would silently turn every curved wall into its chord — a bay window
+ * would lose the whole bulge area and nothing would look wrong on screen.
+ */
+function toRing(entity: PolylineEntity): Ring {
+  return entity.bulges ? { vertices: [...entity.vertices], bulges: [...entity.bulges] } : { vertices: [...entity.vertices] };
 }
 
 /** Total sweep of an arc, exposed for the canvas renderer. */

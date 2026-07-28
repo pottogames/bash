@@ -27,6 +27,12 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)
 
+  packages/classify:
+    dependencies:
+      '@plan2quote/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/core: {}
 
   packages/geometry:
@@ -34,6 +40,18 @@ importers:
       '@plan2quote/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/parsers:
+    dependencies:
+      '@plan2quote/core':
+        specifier: workspace:*
+        version: link:../core
+      '@plan2quote/geometry':
+        specifier: workspace:*
+        version: link:../geometry
+      dxf-parser:
+        specifier: ^1.1.2
+        version: 1.1.2
 
 packages:
 
@@ -559,6 +577,9 @@ packages:
   deep-is@0.1.4:
     resolution: {integrity: sha512-oIPzksmTg4/MriiaYGO+okXDT7ztn/w3Eptv/+gSIdMdKsJo0u4CfYNFJPy+4SKMuCqGw2wxnA+URMg3t8a/bQ==}
 
+  dxf-parser@1.1.2:
+    resolution: {integrity: sha512-GPTumUvRkounlIazLIyJMmTWt+nlg+ksS0Hdm8jWvejmZKBTz6gvHTam76wRm4PQMma5sgKLThblQyeIJcH79Q==}
+
   es-module-lexer@1.7.0:
     resolution: {integrity: sha512-jEQoCwk8hyb2AZziIOLhDqpm5+2ww5uIE6lkO/6jcOCusfk6LhMHpXXfBLXTZ7Ydyt0j4VoUQv6uGNYbdW+kBA==}
 
@@ -727,6 +748,10 @@ packages:
 
   lodash.merge@4.6.2:
     resolution: {integrity: sha512-0KpjqXRVvrYyCsX1swR/XTK0va6VQkQM6MNo7PqW77ByjAhoARA8EfrP1N4+KlKj8YS0ZUCtRT/YUuhyYDujIQ==}
+
+  loglevel@1.9.2:
+    resolution: {integrity: sha512-HgMmCqIJSAKqo68l0rS2AanEWfkxaZ5wNiEFb5ggm08lDs9Xl2KxBlX3PTcaD2chBM1gXAYf491/M2Rv8Jwayg==}
+    engines: {node: '>= 0.6.0'}
 
   loupe@3.2.1:
     resolution: {integrity: sha512-CdzqowRJCeLU72bHvWqwRBBlLcMEtIvGrlvef74kMnV2AolS9Y8xUv1I0U/MNAWMhBlKIoyuEgoJ0t/bbwHbLQ==}
@@ -1403,6 +1428,10 @@ snapshots:
 
   deep-is@0.1.4: {}
 
+  dxf-parser@1.1.2:
+    dependencies:
+      loglevel: 1.9.2
+
   es-module-lexer@1.7.0: {}
 
   esbuild@0.21.5:
@@ -1587,6 +1616,8 @@ snapshots:
       p-locate: 5.0.0
 
   lodash.merge@4.6.2: {}
+
+  loglevel@1.9.2: {}
 
   loupe@3.2.1: {}
 

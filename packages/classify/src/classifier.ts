@@ -167,7 +167,11 @@ export function classifyLayer(input: ClassifyInput): LayerClassification {
     return {
       sourceKey,
       trade: keyword.trade,
-      measureType: overrideMeasure(sourceName, keyword.measureType ?? geometry.measureType, evidence),
+      measureType: overrideMeasure(
+        sourceName,
+        resolveMeasureType(keyword.measureType, geometry, evidence),
+        evidence,
+      ),
       confidence,
       source: 'keyword',
       evidence,
@@ -352,6 +356,33 @@ function matchesLoosely(term: string, normalised: string, searchable: Set<string
   if (term.includes(' ')) return normalised.includes(term);
   if (term.length < 4) return false;
   return normalised.includes(term);
+}
+
+/**
+ * Chooses between what the trade is *usually* measured in and what this layer
+ * actually contains.
+ *
+ * The dictionary's measure type is a habit — masonry is normally an area — but
+ * a layer holding nothing but open lines is a set of wall runs, and measuring
+ * its area gives zero. When the entity mix is clear-cut the drawing wins, and
+ * the disagreement is recorded so the user can see why the unit is not the one
+ * they expected.
+ */
+function resolveMeasureType(
+  fromKeyword: MeasureType | undefined,
+  geometry: { measureType: MeasureType; confidence: number; explanation: string },
+  evidence: ClassificationEvidence[],
+): MeasureType {
+  if (geometry.confidence >= 0.7 && fromKeyword && geometry.measureType !== fromKeyword) {
+    evidence.push({
+      kind: 'geometry_hint',
+      matched: geometry.explanation,
+      weight: geometry.confidence,
+      explanation: `${geometry.explanation} לכן סוג המדידה נקבע לפי תוכן השכבה ולא לפי המקצוע.`,
+    });
+    return geometry.measureType;
+  }
+  return fromKeyword ?? geometry.measureType;
 }
 
 /** A `שטח` / `אורך` / `נפח` word in the name overrides whatever the trade implied. */

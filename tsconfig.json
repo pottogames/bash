@@ -1,0 +1,17 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "packages/core"
+    },
+    {
+      "path": "packages/geometry"
+    },
+    {
+      "path": "packages/classify"
+    },
+    {
+      "path": "packages/parsers"
+    }
+  ]
+}

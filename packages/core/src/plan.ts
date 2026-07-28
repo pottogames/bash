@@ -44,6 +44,12 @@ export interface PolylineEntity extends EntityBase {
   kind: 'polyline';
   vertices: Vec2[];
   closed: boolean;
+  /**
+   * DXF bulge per segment — `bulges[i]` curves the side from vertex `i` to
+   * `i + 1`. Preserved rather than tessellated so curved walls and bay windows
+   * measure exactly. See `@plan2quote/geometry/arc`.
+   */
+  bulges?: number[];
   /** Set when the parser closed an almost-closed polyline itself. Surfaces as a warning. */
   autoClosed?: boolean;
   /** Constant width, if the source carried one (DXF LWPOLYLINE). Metres. */

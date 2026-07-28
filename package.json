@@ -2,18 +2,19 @@
   "name": "plan2quote",
   "private": true,
   "version": "0.1.0",
-  "description": "AI-free construction plan → bill of quantities → quote → per-trade work packages",
+  "description": "AI-free construction plan \u2192 bill of quantities \u2192 quote \u2192 per-trade work packages",
   "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "build": "pnpm -r --filter \"./packages/*\" run build",
-    "typecheck": "pnpm -r run typecheck",
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "clean": "tsc -b --clean"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
