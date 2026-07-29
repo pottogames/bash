@@ -2,7 +2,7 @@
   "name": "plan2quote",
   "private": true,
   "version": "0.1.0",
-  "description": "AI-free construction plan → bill of quantities → quote → per-trade work packages",
+  "description": "Construction plan → bill of quantities → quote → per-trade work packages",
   "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=22"

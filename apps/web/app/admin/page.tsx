@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActionIcon,
   Alert,
@@ -36,6 +36,23 @@ import {
   IconX,
 } from '@tabler/icons-react';
 import { PageHeader } from '@/components/PageHeader';
+import { DataState } from '@/components/DataState';
+import {
+  approveMembership,
+  createInvitation,
+  fetchInvitations,
+  fetchMembers,
+  fetchRolePermissions,
+  fetchRoles,
+  fetchSession,
+  revokeInvitation,
+  revokeMembership,
+  suspendMembership,
+  type InvitationRow,
+  type MemberRow,
+} from '@/lib/queries';
+import { useQuery } from '@/lib/use-query';
+import type { Role } from '@/lib/supabase/types';
 
 /**
  * Administration.
@@ -51,18 +68,6 @@ import { PageHeader } from '@/components/PageHeader';
  * `active`. See `supabase/migrations/*_rls.sql` and the tests in
  * `supabase/tests/10_rls.test.sql`.
  */
-
-const ROLES = [
-  { value: 'owner', label: 'בעלים' },
-  { value: 'admin', label: 'מנהל מערכת' },
-  { value: 'project_manager', label: 'מנהל פרויקט' },
-  { value: 'estimator', label: 'מודד כמויות' },
-  { value: 'viewer', label: 'צופה' },
-  { value: 'subcontractor', label: 'קבלן משנה' },
-  { value: 'supplier', label: 'ספק' },
-  { value: 'client', label: 'לקוח / יזם' },
-  { value: 'architect', label: 'אדריכל' },
-];
 
 const PERMISSION_GROUPS = [
   {
@@ -105,42 +110,46 @@ const PERMISSION_GROUPS = [
   },
 ] as const;
 
-/** Defaults per role. Mirrors the seed migration; the database is authoritative. */
-const ROLE_DEFAULTS: Record<string, string[]> = {
-  project_manager: [
-    'plan.upload', 'plan.download_source', 'layer.update', 'quantity.update', 'quantity.approve',
-    'price.cost.read', 'price.update', 'quote.create', 'quote.send',
-    'package.create', 'package.send', 'bid.read', 'bid.award',
-  ],
-  estimator: [
-    'plan.upload', 'layer.update', 'quantity.update', 'quantity.approve',
-    'price.cost.read', 'price.update', 'quote.create', 'bid.read',
-  ],
-  viewer: [],
-  subcontractor: [],
-  supplier: [],
-  client: [],
-  architect: ['plan.upload', 'plan.download_source', 'layer.update'],
-  admin: PERMISSION_GROUPS.flatMap((g) => g.items.map((i) => i.key)),
-  owner: PERMISSION_GROUPS.flatMap((g) => g.items.map((i) => i.key)),
+const STATUS_LABEL: Record<string, { label: string; color: string }> = {
+  active: { label: 'פעיל', color: 'verified' },
+  suspended: { label: 'מושעה', color: 'alert' },
+  expired: { label: 'פג תוקף', color: 'slate' },
+  revoked: { label: 'נשלל', color: 'alert' },
 };
 
-const PENDING = [
-  { id: '1', name: 'דוד כהן', email: 'david@cohen-electric.co.il', company: 'כהן חשמל בע״מ', role: 'subcontractor', registeredAt: 'לפני 2 שעות' },
-  { id: '2', name: 'מיכל אברהם', email: 'michal@example.com', company: 'אברהם אדריכלים', role: 'architect', registeredAt: 'אתמול' },
-  { id: '3', name: 'יוסי לוי', email: 'yossi@levi-plumbing.co.il', company: 'לוי אינסטלציה', role: 'subcontractor', registeredAt: 'לפני 3 ימים' },
-];
-
-const ACTIVE = [
-  { name: 'רון שמעוני', email: 'ron@office.co.il', role: 'owner', status: 'פעיל', expires: null },
-  { name: 'נועה ברק', email: 'noa@office.co.il', role: 'estimator', status: 'פעיל', expires: null },
-  { name: 'כהן חשמל בע״מ', email: 'david@cohen-electric.co.il', role: 'subcontractor', status: 'פעיל', expires: '31.08.2026' },
-  { name: 'שיש ואבן ג. מזרחי', email: 'g@mizrahi-stone.co.il', role: 'supplier', status: 'מושעה', expires: null },
-];
+const INVITATION_STATUS_LABEL: Record<string, { label: string; color: string }> = {
+  pending: { label: 'ממתין', color: 'caution' },
+  redeemed: { label: 'מומש', color: 'verified' },
+  expired: { label: 'פג תוקף', color: 'slate' },
+  revoked: { label: 'בוטל', color: 'alert' },
+};
 
 export default function AdminPage() {
   const [inviteOpen, invite] = useDisclosure(false);
-  const [approveTarget, setApproveTarget] = useState<(typeof PENDING)[number] | null>(null);
+  const [approveTarget, setApproveTarget] = useState<MemberRow | null>(null);
+
+  const session = useQuery(fetchSession, []);
+  const members = useQuery(fetchMembers, []);
+  const invitations = useQuery(fetchInvitations, []);
+  const roles = useQuery(fetchRoles, []);
+
+  const pending = (members.data ?? []).filter((m) => m.status === 'pending_approval');
+  const active = (members.data ?? []).filter((m) => m.status !== 'pending_approval');
+
+  const reload = () => {
+    members.reload();
+    invitations.reload();
+  };
+
+  const reject = async (membershipId: string) => {
+    await revokeMembership(membershipId);
+    reload();
+  };
+
+  const toggleSuspend = async (member: MemberRow) => {
+    await suspendMembership(member.id);
+    reload();
+  };
 
   return (
     <Box>
@@ -148,19 +157,23 @@ export default function AdminPage() {
         title="משתמשים והרשאות"
         description="חשבון חדש נוצר רק מול קוד הזמנה שהונפק כאן, והוא לא פעיל עד שמנהל בדק ואישר את התפקיד וההרשאות שלו. שני השלבים נאכפים במסד הנתונים ולא בממשק."
         actions={
-          <Button leftSection={<IconUserPlus size={16} />} onClick={invite.open}>
+          <Button
+            leftSection={<IconUserPlus size={16} />}
+            onClick={invite.open}
+            disabled={!session.data?.orgId}
+          >
             הנפקת קוד הזמנה
           </Button>
         }
       />
 
-      {PENDING.length > 0 && (
+      {pending.length > 0 && (
         <Alert
           variant="light"
           color="caution"
           icon={<IconAlertTriangle size={18} />}
           mb="md"
-          title={`${PENDING.length} חשבונות ממתינים לאישור`}
+          title={`${pending.length} חשבונות ממתינים לאישור`}
         >
           המשתמשים האלה נרשמו עם קוד תקין ואינם רואים שום מידע עד לאישור. לפני אישור — ודא שהתפקיד
           וההרשאות מתאימים לגורם. אישור חושף בפניו מידע.
@@ -170,7 +183,7 @@ export default function AdminPage() {
       <Tabs defaultValue="pending" variant="outline">
         <Tabs.List mb="md">
           <Tabs.Tab value="pending" leftSection={<IconShieldCheck size={16} />}>
-            ממתינים לאישור ({PENDING.length})
+            ממתינים לאישור ({pending.length})
           </Tabs.Tab>
           <Tabs.Tab value="active" leftSection={<IconCheck size={16} />}>
             משתמשים פעילים
@@ -181,147 +194,287 @@ export default function AdminPage() {
         </Tabs.List>
 
         <Tabs.Panel value="pending">
-          <Card p={0}>
-            <Table>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>משתמש</Table.Th>
-                  <Table.Th w={180}>תפקיד מבוקש</Table.Th>
-                  <Table.Th w={130}>נרשם</Table.Th>
-                  <Table.Th w={220} />
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {PENDING.map((p) => (
-                  <Table.Tr key={p.id}>
-                    <Table.Td>
-                      <Stack gap={1}>
-                        <Text fw={600} size="sm">{p.name}</Text>
-                        <Text size="xs" c="dimmed">{p.email} · {p.company}</Text>
-                      </Stack>
-                    </Table.Td>
-                    <Table.Td>
-                      <Badge variant="light" color="slate">
-                        {ROLES.find((r) => r.value === p.role)?.label}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>
-                      <Text size="xs" c="dimmed">{p.registeredAt}</Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <Group gap="xs" justify="flex-end">
-                        <Button size="xs" variant="light" color="alert" leftSection={<IconX size={14} />}>
-                          דחייה
-                        </Button>
-                        <Button size="xs" onClick={() => setApproveTarget(p)}>
-                          בדיקה ואישור
-                        </Button>
-                      </Group>
-                    </Table.Td>
+          <DataState
+            loading={members.loading}
+            error={members.error}
+            empty={pending.length === 0}
+            emptyTitle="אין חשבונות ממתינים"
+            emptyBody="ברגע שמישהו נרשם עם קוד הזמנה תקין, הבקשה שלו תופיע כאן לבדיקה ואישור."
+          >
+            <Card p={0}>
+              <Table>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>משתמש</Table.Th>
+                    <Table.Th w={180}>תפקיד מבוקש</Table.Th>
+                    <Table.Th w={130}>נרשם</Table.Th>
+                    <Table.Th w={220} />
                   </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </Card>
+                </Table.Thead>
+                <Table.Tbody>
+                  {pending.map((p) => (
+                    <Table.Tr key={p.id}>
+                      <Table.Td>
+                        <Stack gap={1}>
+                          <Text fw={600} size="sm">
+                            {p.profile?.full_name ?? p.profile?.email ?? '—'}
+                          </Text>
+                          <Text size="xs" c="dimmed">
+                            {p.profile?.email} {p.profile?.company_name ? `· ${p.profile.company_name}` : ''}
+                          </Text>
+                        </Stack>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge variant="light" color="slate">
+                          {p.role?.name_he ?? '—'}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        <Text size="xs" c="dimmed">
+                          {new Date(p.created_at).toLocaleDateString('he-IL')}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Group gap="xs" justify="flex-end">
+                          <Button
+                            size="xs"
+                            variant="light"
+                            color="alert"
+                            leftSection={<IconX size={14} />}
+                            onClick={() => void reject(p.id)}
+                          >
+                            דחייה
+                          </Button>
+                          <Button size="xs" onClick={() => setApproveTarget(p)}>
+                            בדיקה ואישור
+                          </Button>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Card>
+          </DataState>
         </Tabs.Panel>
 
         <Tabs.Panel value="active">
-          <Card p={0}>
-            <Table>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>משתמש</Table.Th>
-                  <Table.Th w={180}>תפקיד</Table.Th>
-                  <Table.Th w={110}>סטטוס</Table.Th>
-                  <Table.Th w={150}>תוקף גישה</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {ACTIVE.map((u) => (
-                  <Table.Tr key={u.email}>
-                    <Table.Td>
-                      <Stack gap={1}>
-                        <Text fw={600} size="sm">{u.name}</Text>
-                        <Text size="xs" c="dimmed">{u.email}</Text>
-                      </Stack>
-                    </Table.Td>
-                    <Table.Td>
-                      <Badge variant="light" color="slate">
-                        {ROLES.find((r) => r.value === u.role)?.label}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>
-                      <Badge color={u.status === 'פעיל' ? 'verified' : 'alert'} size="sm">
-                        {u.status}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>
-                      <Text size="sm" c={u.expires ? undefined : 'dimmed'}>
-                        {u.expires ?? 'ללא הגבלה'}
-                      </Text>
-                    </Table.Td>
+          <DataState
+            loading={members.loading}
+            error={members.error}
+            empty={active.length === 0}
+            emptyTitle="אין עדיין משתמשים פעילים"
+            emptyBody="אחרי אישור בקשה בלשונית ״ממתינים לאישור״, המשתמש יופיע כאן."
+          >
+            <Card p={0}>
+              <Table>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>משתמש</Table.Th>
+                    <Table.Th w={180}>תפקיד</Table.Th>
+                    <Table.Th w={110}>סטטוס</Table.Th>
+                    <Table.Th w={150}>תוקף גישה</Table.Th>
+                    <Table.Th w={110} />
                   </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          </Card>
+                </Table.Thead>
+                <Table.Tbody>
+                  {active.map((u) => {
+                    const status = STATUS_LABEL[u.status] ?? { label: u.status, color: 'slate' };
+                    return (
+                      <Table.Tr key={u.id}>
+                        <Table.Td>
+                          <Stack gap={1}>
+                            <Text fw={600} size="sm">
+                              {u.profile?.full_name ?? u.profile?.email ?? '—'}
+                            </Text>
+                            <Text size="xs" c="dimmed">
+                              {u.profile?.email}
+                            </Text>
+                          </Stack>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge variant="light" color="slate">
+                            {u.role?.name_he ?? '—'}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge color={status.color} size="sm">
+                            {status.label}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" c={u.access_expires_at ? undefined : 'dimmed'}>
+                            {u.access_expires_at
+                              ? new Date(u.access_expires_at).toLocaleDateString('he-IL')
+                              : 'ללא הגבלה'}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          {u.status === 'active' && (
+                            <Button size="xs" variant="subtle" color="alert" onClick={() => void toggleSuspend(u)}>
+                              השעיה
+                            </Button>
+                          )}
+                        </Table.Td>
+                      </Table.Tr>
+                    );
+                  })}
+                </Table.Tbody>
+              </Table>
+            </Card>
+          </DataState>
         </Tabs.Panel>
 
         <Tabs.Panel value="invitations">
-          <Card>
-            <Group gap="sm" mb="sm">
-              <ThemeIcon variant="light" color="slate" radius="xl">
-                <IconLock size={16} />
-              </ThemeIcon>
-              <Text size="sm">
-                הקוד עצמו אינו נשמר במסד הנתונים — נשמר רק גיבוב SHA-256 שלו ורמז בן ארבעה תווים.
-                אם הקוד אבד, מנפיקים חדש; אין דרך לשחזר אותו, וזה מכוון.
-              </Text>
-            </Group>
-            <Divider my="sm" />
-            <Table>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>נשלח אל</Table.Th>
-                  <Table.Th w={140}>רמז לקוד</Table.Th>
-                  <Table.Th w={160}>תפקיד</Table.Th>
-                  <Table.Th w={120}>תוקף</Table.Th>
-                  <Table.Th w={110}>סטטוס</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                <Table.Tr>
-                  <Table.Td><Text size="sm">david@cohen-electric.co.il</Text></Table.Td>
-                  <Table.Td><Text className="p2q-source-name">7K3M…QP94</Text></Table.Td>
-                  <Table.Td><Badge variant="light" color="slate">קבלן משנה</Badge></Table.Td>
-                  <Table.Td><Text size="sm" c="dimmed">04.08.2026</Text></Table.Td>
-                  <Table.Td><Badge color="verified" size="sm">מומש</Badge></Table.Td>
-                </Table.Tr>
-                <Table.Tr>
-                  <Table.Td><Text size="sm">office@mizrahi-stone.co.il</Text></Table.Td>
-                  <Table.Td><Text className="p2q-source-name">R2FT…8XHN</Text></Table.Td>
-                  <Table.Td><Badge variant="light" color="slate">ספק</Badge></Table.Td>
-                  <Table.Td><Text size="sm" c="dimmed">02.08.2026</Text></Table.Td>
-                  <Table.Td><Badge color="caution" size="sm">ממתין</Badge></Table.Td>
-                </Table.Tr>
-              </Table.Tbody>
-            </Table>
-          </Card>
+          <DataState
+            loading={invitations.loading}
+            error={invitations.error}
+            empty={(invitations.data ?? []).length === 0}
+            emptyTitle="לא הונפקו קודי הזמנה"
+            emptyBody="קוד הזמנה נדרש לפני שמישהו יכול להירשם בכלל. הנפקה נשלחת במייל וכאן נשמר רק רמז אליה."
+          >
+            <Card>
+              <Group gap="sm" mb="sm">
+                <ThemeIcon variant="light" color="slate" radius="xl">
+                  <IconLock size={16} />
+                </ThemeIcon>
+                <Text size="sm">
+                  הקוד עצמו אינו נשמר במסד הנתונים — נשמר רק גיבוב SHA-256 שלו ורמז בן ארבעה תווים.
+                  אם הקוד אבד, מנפיקים חדש; אין דרך לשחזר אותו, וזה מכוון.
+                </Text>
+              </Group>
+              <Divider my="sm" />
+              <Table>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>נשלח אל</Table.Th>
+                    <Table.Th w={140}>רמז לקוד</Table.Th>
+                    <Table.Th w={160}>תפקיד</Table.Th>
+                    <Table.Th w={120}>תוקף</Table.Th>
+                    <Table.Th w={110}>סטטוס</Table.Th>
+                    <Table.Th w={90} />
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {(invitations.data ?? []).map((inv: InvitationRow) => {
+                    const status = INVITATION_STATUS_LABEL[inv.status] ?? { label: inv.status, color: 'slate' };
+                    return (
+                      <Table.Tr key={inv.id}>
+                        <Table.Td>
+                          <Text size="sm">{inv.email}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text className="p2q-source-name">{inv.code_hint}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge variant="light" color="slate">
+                            {inv.role_name ?? '—'}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="sm" c="dimmed">
+                            {new Date(inv.expires_at).toLocaleDateString('he-IL')}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Badge color={status.color} size="sm">
+                            {status.label}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          {inv.status === 'pending' && (
+                            <Button
+                              size="xs"
+                              variant="subtle"
+                              color="alert"
+                              onClick={() => void revokeInvitation(inv.id).then(() => invitations.reload())}
+                            >
+                              ביטול
+                            </Button>
+                          )}
+                        </Table.Td>
+                      </Table.Tr>
+                    );
+                  })}
+                </Table.Tbody>
+              </Table>
+            </Card>
+          </DataState>
         </Tabs.Panel>
       </Tabs>
 
-      <InviteModal opened={inviteOpen} onClose={invite.close} />
-      <ApprovalModal target={approveTarget} onClose={() => setApproveTarget(null)} />
+      <InviteModal
+        opened={inviteOpen}
+        onClose={invite.close}
+        orgId={session.data?.orgId ?? null}
+        roles={roles.data ?? []}
+        onIssued={() => invitations.reload()}
+      />
+      <ApprovalModal
+        target={approveTarget}
+        roles={roles.data ?? []}
+        onClose={() => setApproveTarget(null)}
+        onApproved={() => {
+          setApproveTarget(null);
+          reload();
+        }}
+      />
     </Box>
   );
 }
 
-function InviteModal({ opened, onClose }: { opened: boolean; onClose: () => void }) {
-  const [role, setRole] = useState<string | null>('subcontractor');
+function InviteModal({
+  opened,
+  onClose,
+  orgId,
+  roles,
+  onIssued,
+}: {
+  opened: boolean;
+  onClose: () => void;
+  orgId: string | null;
+  roles: Role[];
+  onIssued: () => void;
+}) {
+  const [email, setEmail] = useState('');
+  const [roleId, setRoleId] = useState<string | null>(null);
+  const [validForDays, setValidForDays] = useState<string | null>('7');
+  const [accessUntil, setAccessUntil] = useState('');
   const [issued, setIssued] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const close = () => {
+    setEmail('');
+    setRoleId(null);
+    setIssued(null);
+    setError(null);
+    onClose();
+  };
+
+  const submit = async () => {
+    if (!orgId || !roleId || !email) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const result = await createInvitation({
+        orgId,
+        email,
+        roleId,
+        validForDays: Number(validForDays ?? '7'),
+        accessUntil: accessUntil || null,
+      });
+      setIssued(result.code);
+      onIssued();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'הנפקת הקוד נכשלה.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
-    <Modal opened={opened} onClose={onClose} title="הנפקת קוד הזמנה" size="lg">
+    <Modal opened={opened} onClose={close} title="הנפקת קוד הזמנה" size="lg">
       {issued ? (
         <Stack>
           <Alert variant="light" color="caution" icon={<IconAlertTriangle size={18} />}>
@@ -341,18 +494,33 @@ function InviteModal({ opened, onClose }: { opened: boolean; onClose: () => void
               )}
             </CopyButton>
           </Group>
-          <Button onClick={onClose}>סגירה</Button>
+          <Button onClick={close}>סגירה</Button>
         </Stack>
       ) : (
         <Stack>
+          {error && (
+            <Alert variant="light" color="alert" icon={<IconAlertTriangle size={18} />}>
+              {error}
+            </Alert>
+          )}
           <TextInput
             label="כתובת מייל"
             description="הקוד ייקשר לכתובת הזו בלבד. העברה שלו לאדם אחר לא תאפשר לו להירשם."
             placeholder="name@company.co.il"
             leftSection={<IconMail size={16} />}
+            value={email}
+            onChange={(e) => setEmail(e.currentTarget.value)}
             required
           />
-          <Select label="תפקיד" data={ROLES} value={role} onChange={setRole} allowDeselect={false} required />
+          <Select
+            label="תפקיד"
+            data={roles.map((r) => ({ value: r.id, label: r.name_he }))}
+            value={roleId}
+            onChange={setRoleId}
+            allowDeselect={false}
+            required
+            placeholder="בחר תפקיד"
+          />
           <Select
             label="תוקף הקוד"
             data={[
@@ -360,19 +528,22 @@ function InviteModal({ opened, onClose }: { opened: boolean; onClose: () => void
               { value: '7', label: 'שבוע' },
               { value: '30', label: '30 יום' },
             ]}
-            defaultValue="7"
+            value={validForDays}
+            onChange={setValidForDays}
             allowDeselect={false}
           />
           <TextInput
             label="תוקף הגישה עצמה"
             description="לאחר התאריך הזה הכניסה נחסמת אוטומטית. מומלץ למלא עבור קבלנים וספקים — אחרי סגירת המכרז אין סיבה שהגישה תישאר פתוחה."
             type="date"
+            value={accessUntil}
+            onChange={(e) => setAccessUntil(e.currentTarget.value)}
           />
           <Group justify="flex-end" mt="sm">
-            <Button variant="default" onClick={onClose}>
+            <Button variant="default" onClick={close}>
               ביטול
             </Button>
-            <Button onClick={() => setIssued('7K3M-QW82-LH4D-N9TR-B6VC-XZ21-FG55-QP94')}>
+            <Button loading={submitting} disabled={!email || !roleId} onClick={() => void submit()}>
               הנפקה ושליחה במייל
             </Button>
           </Group>
@@ -384,36 +555,78 @@ function InviteModal({ opened, onClose }: { opened: boolean; onClose: () => void
 
 function ApprovalModal({
   target,
+  roles,
   onClose,
+  onApproved,
 }: {
-  target: { name: string; email: string; company: string; role: string } | null;
+  target: MemberRow | null;
+  roles: Role[];
   onClose: () => void;
+  onApproved: () => void;
 }) {
-  const [role, setRole] = useState<string | null>(target?.role ?? null);
+  const rolePermissions = useQuery(fetchRolePermissions, []);
+  const [roleId, setRoleId] = useState<string | null>(target?.role_id ?? null);
   const [granted, setGranted] = useState<string[]>([]);
   const [confirmed, setConfirmed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const effectiveRole = role ?? target?.role ?? 'viewer';
-  const defaults = ROLE_DEFAULTS[effectiveRole] ?? [];
+  const effectiveRoleId = roleId ?? target?.role_id ?? null;
+  const defaults = useMemo(
+    () => (effectiveRoleId ? (rolePermissions.data?.get(effectiveRoleId) ?? []) : []),
+    [effectiveRoleId, rolePermissions.data],
+  );
+
+  const submit = async () => {
+    if (!target || !effectiveRoleId) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await approveMembership({
+        membershipId: target.id,
+        confirmRoleId: effectiveRoleId,
+        grant: granted.filter((g) => !g.startsWith('!')),
+        revoke: granted.filter((g) => g.startsWith('!')).map((g) => g.slice(1)),
+      });
+      onApproved();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'האישור נכשל.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <Modal
       opened={target !== null}
       onClose={onClose}
-      title={`בדיקה ואישור — ${target?.name ?? ''}`}
+      title={`בדיקה ואישור — ${target?.profile?.full_name ?? target?.profile?.email ?? ''}`}
       size="xl"
     >
       {target && (
         <Stack>
+          {error && (
+            <Alert variant="light" color="alert" icon={<IconAlertTriangle size={18} />}>
+              {error}
+            </Alert>
+          )}
           <Card withBorder padding="sm" radius="md">
             <Group gap="xl">
               <Stack gap={1}>
-                <Text size="xs" c="dimmed">מייל</Text>
-                <Text size="sm" fw={600}>{target.email}</Text>
+                <Text size="xs" c="dimmed">
+                  מייל
+                </Text>
+                <Text size="sm" fw={600}>
+                  {target.profile?.email}
+                </Text>
               </Stack>
               <Stack gap={1}>
-                <Text size="xs" c="dimmed">חברה</Text>
-                <Text size="sm" fw={600}>{target.company}</Text>
+                <Text size="xs" c="dimmed">
+                  חברה
+                </Text>
+                <Text size="sm" fw={600}>
+                  {target.profile?.company_name ?? '—'}
+                </Text>
               </Stack>
             </Group>
           </Card>
@@ -421,10 +634,10 @@ function ApprovalModal({
           <Select
             label="תפקיד"
             description="שינוי התפקיד כאן מעדכן את ברירות המחדל של ההרשאות למטה."
-            data={ROLES}
-            value={effectiveRole}
+            data={roles.map((r) => ({ value: r.id, label: r.name_he }))}
+            value={effectiveRoleId}
             onChange={(v) => {
-              setRole(v);
+              setRoleId(v);
               setGranted([]);
               setConfirmed(false);
             }}
@@ -456,7 +669,9 @@ function ApprovalModal({
                   <Stack gap={6}>
                     {group.items.map((item) => {
                       const isDefault = defaults.includes(item.key);
-                      const checked = granted.includes(item.key) ? true : isDefault && !granted.includes(`!${item.key}`);
+                      const checked = granted.includes(item.key)
+                        ? true
+                        : isDefault && !granted.includes(`!${item.key}`);
                       return (
                         <Checkbox
                           key={item.key}
@@ -499,7 +714,12 @@ function ApprovalModal({
             <Button variant="default" onClick={onClose}>
               ביטול
             </Button>
-            <Button disabled={!confirmed} onClick={onClose} leftSection={<IconShieldCheck size={16} />}>
+            <Button
+              disabled={!confirmed}
+              loading={submitting}
+              onClick={() => void submit()}
+              leftSection={<IconShieldCheck size={16} />}
+            >
               אישור והפעלת החשבון
             </Button>
           </Group>

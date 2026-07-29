@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 import {
   ActionIcon,
   Alert,
@@ -40,6 +40,7 @@ import {
 import { SHEET_KIND_LABEL } from '@plan2quote/classify';
 import { FORMAT_GROUPS, FORMATS } from '@plan2quote/parsers';
 import { PageHeader } from '@/components/PageHeader';
+import { DataState } from '@/components/DataState';
 import {
   formatBytes,
   formatConflict,
@@ -50,7 +51,9 @@ import {
   type FileInspection,
   type UploadIntent,
 } from '@/lib/inspect';
-import { DEMO_STRUCTURE } from '@/lib/demo';
+import { fetchStructure } from '@/lib/queries';
+import { useProject } from '@/lib/use-project';
+import { useQuery } from '@/lib/use-query';
 
 /**
  * Multi-file upload.
@@ -82,11 +85,34 @@ type Row = {
   include: boolean;
 };
 
-const FLOOR_OPTIONS = DEMO_STRUCTURE.buildings.flatMap((b) =>
-  b.floors.map((f) => ({ value: `${b.name}|${f.level}`, label: `${b.name} · ${f.name}` })),
-);
-
 export default function UploadPage() {
+  return (
+    <Suspense fallback={null}>
+      <UploadScreen />
+    </Suspense>
+  );
+}
+
+function UploadScreen() {
+  const { project, loading: projectLoading, error: projectError } = useProject();
+  const projectId = project?.id ?? null;
+  const structureQuery = useQuery(
+    () => (projectId ? fetchStructure(projectId) : Promise.resolve(null)),
+    [projectId],
+  );
+
+  const floorOptions = useMemo(
+    () =>
+      (structureQuery.data?.buildings ?? []).flatMap((building) =>
+        building.floors.map((floor) => ({
+          value: floor.id,
+          label: `${building.name} · ${floor.name}`,
+          level: floor.level,
+        })),
+      ),
+    [structureQuery.data],
+  );
+
   const [intent, setIntent] = useState<UploadIntent>('auto');
   const [rows, setRows] = useState<Row[]>([]);
   const [formatsOpen, formats] = useDisclosure(false);
@@ -123,8 +149,7 @@ export default function UploadPage() {
                   include: !duplicate && !inspection.error && usable,
                   ...(duplicate ? { duplicateOf: duplicate.file.name } : {}),
                   floorId: inspection.floorGuess
-                    ? (FLOOR_OPTIONS.find((o) => o.value.endsWith(`|${inspection.floorGuess!.level}`))
-                        ?.value ?? null)
+                    ? (floorOptions.find((o) => o.level === inspection.floorGuess!.level)?.value ?? null)
                     : null,
                 }
               : r,
@@ -132,7 +157,7 @@ export default function UploadPage() {
         });
       }
     },
-    [rows.length],
+    [rows.length, floorOptions],
   );
 
   const ready = rows.filter((r) => r.status === 'ready');
@@ -164,6 +189,13 @@ export default function UploadPage() {
         }
       />
 
+      <DataState
+        loading={projectLoading}
+        error={projectError}
+        empty={!project}
+        emptyTitle="אין עדיין פרויקטים"
+        emptyBody="כדי לשייך תוכניות לקומות ולאזורים צריך פרויקט קודם. בלי פרויקט הקבצים עדיין ייקראו ויסווגו, אבל לא יהיה לאן לשייך אותם."
+      >
       {/* ------------------------------------------------- step 1: intent */}
       <Card mb="md">
         <Group gap="sm" mb="xs">
@@ -395,6 +427,7 @@ export default function UploadPage() {
                     key={`${row.file.name}-${index}`}
                     row={row}
                     intent={intent}
+                    floorOptions={floorOptions}
                     onToggle={(include) =>
                       setRows((prev) => prev.map((r, j) => (j === index ? { ...r, include } : r)))
                     }
@@ -418,6 +451,7 @@ export default function UploadPage() {
           <Progress value={(ready.length / rows.length) * 100} w={200} size="sm" color="verified" />
         </Group>
       )}
+      </DataState>
     </Box>
   );
 }
@@ -425,12 +459,14 @@ export default function UploadPage() {
 function FileRow({
   row,
   intent,
+  floorOptions,
   onToggle,
   onFloor,
   onRemove,
 }: {
   row: Row;
   intent: UploadIntent;
+  floorOptions: { value: string; label: string; level: number }[];
   onToggle: (include: boolean) => void;
   onFloor: (floorId: string | null) => void;
   onRemove: () => void;
@@ -593,7 +629,7 @@ function FileRow({
           placeholder="בחר קומה"
           value={row.floorId}
           onChange={onFloor}
-          data={FLOOR_OPTIONS}
+          data={floorOptions}
           searchable
           clearable
         />
