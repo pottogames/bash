@@ -81,6 +81,22 @@ document.documentElement.setAttribute('dir', 'rtl');
 document.documentElement.setAttribute('lang', 'he');
 
 /**
+ * Ensures a viewport meta tag exists.
+ *
+ * The host owns `<head>`, and without `width=device-width` a phone lays the
+ * page out at 980 CSS pixels and then scales it down — every label ends up
+ * unreadable and the mobile breakpoints never fire, so the desktop navbar
+ * shows instead of the burger. Adding it here is the only place this page can
+ * reach that element.
+ */
+if (!document.querySelector('meta[name="viewport"]')) {
+  const meta = document.createElement('meta');
+  meta.name = 'viewport';
+  meta.content = 'width=device-width, initial-scale=1, viewport-fit=cover';
+  document.head.appendChild(meta);
+}
+
+/**
  * Bridges the host page's theme to Mantine's.
  *
  * The artifact viewer stamps `data-theme="dark"` / `"light"` on the root
