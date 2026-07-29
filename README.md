@@ -46,12 +46,29 @@ docs/
 ## הרצה
 
 ```bash
+git clone -b claude/construction-plans-system-40nm0n https://github.com/pottogames/bash.git
+cd bash
+corepack enable                    # מפעיל pnpm בגרסה שהפרויקט מצפה לה
 pnpm install
-pnpm build              # tsc -b על כל החבילות
+pnpm build                         # tsc -b על כל החבילות
+pnpm --filter @plan2quote/web dev  # http://localhost:3000
+```
+
+בדיקות:
+
+```bash
 pnpm test               # 189 בדיקות יחידה
 ./scripts/test-db.sh    # מיגרציות + 15 תרחישי RLS מול Postgres
-pnpm --filter @plan2quote/web dev
 ```
+
+### אירוח ציבורי
+
+`.github/workflows/pages.yml` בונה ייצוא סטטי ומפרסם אותו ל-GitHub Pages.
+הוא לא ירוץ עד שמישהו עם הרשאות אדמין יגדיר פעם אחת
+**Settings → Pages → Source → GitHub Actions** — ה-token של ה-Actions לא מורשה
+להפעיל את Pages בעצמו. אחרי ההגדרה מריצים את ה-workflow ידנית (Actions →
+Deploy demo to GitHub Pages → Run workflow), והאתר יעלה על
+`https://pottogames.github.io/bash/`.
 
 `scripts/test-db.sh` מצפה ל-Postgres זמין (ראה משתני `PG*`). הוא לא דורש את
 Supabase CLI — `supabase/tests/00_auth_stub.sql` מספק את `auth.users` ואת
