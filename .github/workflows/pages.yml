@@ -1,0 +1,79 @@
+name: Deploy demo to GitHub Pages
+
+# Publishes the web app as a static site so it can be opened from a phone
+# without a login. Every page in the app is a client component, so a static
+# export is the whole application — only the parts that need Supabase are
+# absent, and those are absent from any preview by definition.
+
+# Runs on demand and on main, not on every feature-branch push.
+#
+# Enabling Pages is a repository setting, and the workflow's GITHUB_TOKEN is
+# not allowed to make it: `configure-pages` returns "Resource not accessible by
+# integration". Somebody with admin rights has to set
+# Settings -> Pages -> Source to "GitHub Actions" once. Until that happens this
+# workflow cannot succeed, so it stays off the default push path rather than
+# painting every commit red.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time. Cancelling a running deploy mid-flight can leave
+# the site serving a half-uploaded artifact, so in-progress runs finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Configure Pages
+        id: pages
+        # No `enablement: true`: the token cannot create the Pages site, and
+        # asking it to only turns a clear setup step into an opaque 403.
+        uses: actions/configure-pages@v5
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      - name: Build static export
+        working-directory: apps/web
+        env:
+          P2Q_STATIC_EXPORT: '1'
+          # A project site is served from `https://<user>.github.io/<repo>/`,
+          # so the base path is the repository name.
+          P2Q_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+        run: pnpm exec next build
+
+      - name: Disable Jekyll
+        # Without this, Pages runs the output through Jekyll, which drops every
+        # directory beginning with an underscore — including `_next`, i.e. all
+        # of the JavaScript and CSS.
+        run: touch apps/web/out/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

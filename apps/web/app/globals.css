@@ -1,0 +1,67 @@
+@import '@mantine/core/styles.css';
+@import '@mantine/notifications/styles.css';
+
+:root {
+  --p2q-surface: light-dark(oklch(0.99 0.002 250), oklch(0.19 0.010 250));
+  --p2q-surface-raised: light-dark(oklch(1 0 0), oklch(0.23 0.012 250));
+  --p2q-border: light-dark(oklch(0.90 0.006 250), oklch(0.32 0.014 250));
+  --p2q-text-muted: light-dark(oklch(0.52 0.012 250), oklch(0.68 0.012 250));
+
+  /* The grid behind the plan canvas and the empty states. */
+  --p2q-grid: light-dark(oklch(0.93 0.006 250), oklch(0.27 0.012 250));
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--p2q-surface);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/*
+ * Numbers in a bill of quantities are read down the column, so they are set in
+ * tabular figures and forced to LTR. Without the direction override, a figure
+ * like "19.5-" in an RTL paragraph renders with the minus on the wrong side,
+ * which is not a cosmetic problem when the number is a credit note.
+ */
+.p2q-numeric {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: end;
+}
+
+/* Layer source names come from a CAD file and are frequently Latin inside an
+   otherwise Hebrew row. Isolating them stops the bidi algorithm reordering the
+   punctuation around them. */
+.p2q-source-name {
+  unicode-bidi: isolate;
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 0.8125rem;
+}
+
+.p2q-grid-bg {
+  background-image:
+    linear-gradient(to right, var(--p2q-grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--p2q-grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* A quiet, permanent reminder that a screen's numbers rest on an unverified
+   scale. Deliberately not dismissible. */
+.p2q-unverified {
+  position: relative;
+}
+
+.p2q-unverified::after {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  inset-block: 0;
+  width: 3px;
+  background: var(--mantine-color-caution-6);
+}
