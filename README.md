@@ -48,16 +48,26 @@ docs/
 ```bash
 git clone -b claude/construction-plans-system-40nm0n https://github.com/pottogames/bash.git
 cd bash
-corepack enable                    # מפעיל pnpm בגרסה שהפרויקט מצפה לה
-pnpm install
-pnpm build                         # tsc -b על כל החבילות
-pnpm --filter @plan2quote/web dev  # http://localhost:3000
+npm install
+npm run dev     # בונה את החבילות ומרים את האפליקציה על http://localhost:3000
 ```
+
+עובד גם עם pnpm — `pnpm install && pnpm dev`. שני מנהלי החבילות מקשרים את
+חבילות ה-workspace, בזכות `link-workspace-packages` ב-`.npmrc` ותלויות פנימיות
+שמוצהרות כטווח גרסה רגיל ולא בפרוטוקול `workspace:` שרק pnpm מבין.
+
+לצפייה מהפלאפון באותה רשת WiFi:
+
+```bash
+npm --prefix apps/web run dev -- --hostname 0.0.0.0
+```
+
+השרת ידפיס שורת `Network:` עם כתובת IP — זו הכתובת שפותחים בפלאפון.
 
 בדיקות:
 
 ```bash
-pnpm test               # 189 בדיקות יחידה
+npm test                # 189 בדיקות יחידה
 ./scripts/test-db.sh    # מיגרציות + 15 תרחישי RLS מול Postgres
 ```
 

@@ -48,16 +48,16 @@ importers:
         specifier: ^7.17.0
         version: 7.17.8(@mantine/core@7.17.8(@mantine/hooks@7.17.8(react@19.2.8))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@mantine/hooks@7.17.8(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@plan2quote/classify':
-        specifier: workspace:*
+        specifier: '*'
         version: link:../../packages/classify
       '@plan2quote/core':
-        specifier: workspace:*
+        specifier: '*'
         version: link:../../packages/core
       '@plan2quote/geometry':
-        specifier: workspace:*
+        specifier: '*'
         version: link:../../packages/geometry
       '@plan2quote/parsers':
-        specifier: workspace:*
+        specifier: '*'
         version: link:../../packages/parsers
       '@supabase/ssr':
         specifier: ^0.5.2
@@ -103,7 +103,7 @@ importers:
   packages/classify:
     dependencies:
       '@plan2quote/core':
-        specifier: workspace:*
+        specifier: '*'
         version: link:../core
 
   packages/core: {}
@@ -111,16 +111,16 @@ importers:
   packages/geometry:
     dependencies:
       '@plan2quote/core':
-        specifier: workspace:*
+        specifier: '*'
         version: link:../core
 
   packages/parsers:
     dependencies:
       '@plan2quote/core':
-        specifier: workspace:*
+        specifier: '*'
         version: link:../core
       '@plan2quote/geometry':
-        specifier: workspace:*
+        specifier: '*'
         version: link:../geometry
       dxf-parser:
         specifier: ^1.1.2

@@ -16,7 +16,7 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
-    "@plan2quote/core": "workspace:*"
+    "@plan2quote/core": "*"
   },
   "files": [
     "dist"

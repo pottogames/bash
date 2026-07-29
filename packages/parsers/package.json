@@ -16,8 +16,8 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
-    "@plan2quote/core": "workspace:*",
-    "@plan2quote/geometry": "workspace:*",
+    "@plan2quote/core": "*",
+    "@plan2quote/geometry": "*",
     "dxf-parser": "^1.1.2"
   },
   "files": [

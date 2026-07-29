@@ -9,3 +9,4 @@ coverage/
 .DS_Store
 dist-demo/
 out/
+package-lock.json
